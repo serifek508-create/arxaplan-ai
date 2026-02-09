@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Wand2, Image as ImageIcon, RotateCcw, RotateCw, Share2, 
-  Download, Eraser, Palette, Component, ChevronLeft, Minus, Plus, Maximize,
-  SplitSquareHorizontal, Grid, User, Loader2, Upload, UploadCloud, Sparkles, CheckCircle2, Copy, Check
+  Download, Palette, Component, ChevronLeft, Minus, Plus, Maximize,
+  SplitSquareHorizontal, Grid, User, Loader2, Upload, UploadCloud, Sparkles, 
+  CheckCircle2, Check, SlidersHorizontal, FileDown, Send
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import ImageSlider from './ImageSlider';
 import { useToast } from '../lib/useToast';
+import { generateAIBackground, AI_BG_PRESETS } from '../lib/openai';
 
 const Editor: React.FC = () => {
   const location = useLocation();
@@ -24,6 +26,20 @@ const Editor: React.FC = () => {
   const [shadowOffsetY, setShadowOffsetY] = useState(8);
   const [shadowBlur, setShadowBlur] = useState(16);
   const [shadowColor, setShadowColor] = useState('rgba(0,0,0,0.3)');
+
+  // AI Background state
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGeneratingBg, setIsGeneratingBg] = useState(false);
+  const [bgImage, setBgImage] = useState<string | null>(null);
+
+  // Filter state
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [saturation, setSaturation] = useState(100);
+
+  // Export state
+  const [exportFormat, setExportFormat] = useState<'png' | 'webp' | 'jpg'>('png');
+  const [exportQuality, setExportQuality] = useState(92);
 
   // Image Processing State
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -85,6 +101,11 @@ const Editor: React.FC = () => {
     setError(null);
     setCustomBgColor('');
     setIsHd(false);
+    setBgImage(null);
+    setBrightness(100);
+    setContrast(100);
+    setSaturation(100);
+    setAiPrompt('');
     
     removeBackground(file);
   };
@@ -213,15 +234,70 @@ const Editor: React.FC = () => {
     }
   };
 
-  const handleDownload = () => {
+  // AI Background Generator
+  const handleGenerateAIBg = async (prompt: string) => {
+    if (!processedImage) { addToast('Əvvəlcə şəkil emal edin', 'error'); return; }
+    setIsGeneratingBg(true);
+    try {
+      const result = await generateAIBackground(prompt);
+      setBgImage(result.imageDataUrl);
+      setCustomBgColor('');
+      setViewMode('transparent');
+      pushToHistory(processedImage, 'AI fon yaradıldı');
+      addToast('AI fon uğurla yaradıldı!', 'success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'AI fon yaradıla bilmədi';
+      addToast(message, 'error');
+    } finally {
+      setIsGeneratingBg(false);
+    }
+  };
+
+  // Enhanced Download with format & filter support
+  const handleDownload = async () => {
     if (!processedImage) return;
-    const link = document.createElement('a');
-    link.href = processedImage;
-    link.download = `arxaplan_${isHd ? 'HD' : 'removed'}_${fileName}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('Şəkil uğurla yükləndi!', 'success');
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = processedImage;
+      await img.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d')!;
+      if (bgImage) {
+        const bg = new Image();
+        bg.crossOrigin = 'anonymous';
+        bg.src = bgImage;
+        await bg.decode();
+        ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+      } else if (customBgColor) {
+        ctx.fillStyle = customBgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+      ctx.drawImage(img, 0, 0);
+      ctx.filter = 'none';
+      const mime = exportFormat === 'png' ? 'image/png' : exportFormat === 'webp' ? 'image/webp' : 'image/jpeg';
+      const quality = exportFormat === 'png' ? undefined : exportQuality / 100;
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `arxaplan_${isHd ? 'HD_' : ''}${fileName.split('.')[0]}.${exportFormat}`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+        addToast(`${exportFormat.toUpperCase()} formatında yükləndi!`, 'success');
+      }, mime, quality);
+    } catch {
+      const a = document.createElement('a');
+      a.href = processedImage;
+      a.download = `arxaplan_${fileName}`;
+      a.click();
+      addToast('Şəkil yükləndi!', 'success');
+    }
   };
 
   const handleShare = async () => {
@@ -433,6 +509,7 @@ const Editor: React.FC = () => {
                         key={i}
                         onClick={() => {
                            setCustomBgColor(color === 'transparent' ? '' : color);
+                           setBgImage(null);
                            if (viewMode === 'compare') setViewMode('transparent'); 
                         }}
                         className={`w-6 h-6 rounded-full border border-slate-200 shadow-sm ${customBgColor === color ? 'ring-2 ring-primary ring-offset-1' : ''}`}
@@ -516,6 +593,154 @@ const Editor: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* === AI & Advanced Tools === */}
+            <div className="border-t border-slate-100 pt-3 mt-3">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 hidden lg:block mb-2">AI & Əlavə</div>
+            </div>
+
+            {/* AI Background Generator */}
+            <SidebarButton 
+              active={activeTool === 'aibg'} 
+              icon={<Sparkles className="w-5 h-5" />} 
+              label="AI Fon Yarat" 
+              onClick={() => setActiveTool('aibg')}
+            />
+            {activeTool === 'aibg' && (
+              <div className="hidden lg:block mt-1 px-4 py-3 bg-gradient-to-b from-violet-50/50 to-white/50 rounded-lg border border-violet-200/50">
+                <p className="text-xs text-slate-500 font-medium mb-3">DALL·E 3 ilə yeni arxa plan yaradın</p>
+                <div className="grid grid-cols-2 gap-1.5 mb-3">
+                  {AI_BG_PRESETS.map(preset => (
+                    <button
+                      key={preset.id}
+                      onClick={() => { setAiPrompt(preset.prompt); handleGenerateAIBg(preset.prompt); }}
+                      disabled={isGeneratingBg || !processedImage}
+                      className="text-left p-2 rounded-lg bg-white hover:bg-violet-50 border border-gray-100 hover:border-violet-200 transition-all text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <span className="text-base">{preset.emoji}</span>
+                      <span className="block font-medium text-gray-700 mt-0.5">{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="Xüsusi prompt yazın..."
+                    value={aiPrompt}
+                    onChange={e => setAiPrompt(e.target.value)}
+                    className="flex-1 h-8 px-3 rounded-lg border border-gray-200 text-xs focus:border-violet-400 focus:ring-1 focus:ring-violet-200 outline-none transition-all"
+                    onKeyDown={e => e.key === 'Enter' && aiPrompt && handleGenerateAIBg(aiPrompt)}
+                  />
+                  <button
+                    onClick={() => aiPrompt && handleGenerateAIBg(aiPrompt)}
+                    disabled={!aiPrompt || isGeneratingBg || !processedImage}
+                    className="h-8 w-8 rounded-lg bg-violet-500 hover:bg-violet-600 text-white flex items-center justify-center disabled:opacity-40 transition-colors shrink-0"
+                  >
+                    {isGeneratingBg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                {bgImage && (
+                  <button
+                    onClick={() => { setBgImage(null); addToast('AI fon silindi', 'info'); }}
+                    className="text-xs text-red-400 hover:text-red-600 font-medium mt-2 transition-colors"
+                  >
+                    AI fonu sil
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Filters */}
+            <SidebarButton 
+              active={activeTool === 'filters'} 
+              icon={<SlidersHorizontal className="w-5 h-5" />} 
+              label="Filtrlər" 
+              onClick={() => setActiveTool('filters')}
+            />
+            {activeTool === 'filters' && (
+              <div className="hidden lg:block mt-1 px-4 py-3 bg-white/50 rounded-lg border border-primary/10">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-500 font-medium">Parlaqlıq</span>
+                      <span className="text-xs text-primary font-bold">{brightness}%</span>
+                    </div>
+                    <input type="range" min="50" max="150" step="1" value={brightness}
+                      onChange={e => setBrightness(parseInt(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-500 font-medium">Kontrast</span>
+                      <span className="text-xs text-primary font-bold">{contrast}%</span>
+                    </div>
+                    <input type="range" min="50" max="150" step="1" value={contrast}
+                      onChange={e => setContrast(parseInt(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-500 font-medium">Doyğunluq</span>
+                      <span className="text-xs text-primary font-bold">{saturation}%</span>
+                    </div>
+                    <input type="range" min="0" max="200" step="1" value={saturation}
+                      onChange={e => setSaturation(parseInt(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary" />
+                  </div>
+                  <button
+                    onClick={() => { setBrightness(100); setContrast(100); setSaturation(100); }}
+                    className="text-xs text-red-400 hover:text-red-600 font-medium mt-1 transition-colors"
+                  >
+                    Filtrləri sıfırla
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Export Options */}
+            <SidebarButton 
+              active={activeTool === 'export'} 
+              icon={<FileDown className="w-5 h-5" />} 
+              label="Export Seçimləri" 
+              onClick={() => setActiveTool('export')}
+            />
+            {activeTool === 'export' && (
+              <div className="hidden lg:block mt-1 px-4 py-3 bg-white/50 rounded-lg border border-primary/10">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <span className="text-xs text-slate-500 font-medium block mb-2">Format</span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(['png', 'webp', 'jpg'] as const).map(fmt => (
+                        <button
+                          key={fmt}
+                          onClick={() => setExportFormat(fmt)}
+                          className={`py-1.5 rounded-lg text-xs font-bold transition-all ${exportFormat === fmt ? 'bg-primary text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        >
+                          {fmt.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {exportFormat !== 'png' && (
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs text-slate-500 font-medium">Keyfiyyət</span>
+                        <span className="text-xs text-primary font-bold">{exportQuality}%</span>
+                      </div>
+                      <input type="range" min="10" max="100" step="1" value={exportQuality}
+                        onChange={e => setExportQuality(parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary" />
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {exportFormat === 'png' && 'Şəffaf fon dəstəyi · Ən yaxşı keyfiyyət'}
+                    {exportFormat === 'webp' && 'Kiçik fayl ölçüsü · Web üçün ideal'}
+                    {exportFormat === 'jpg' && 'Universal format · Ən geniş dəstək'}
+                  </p>
+                </div>
+              </div>
+            )}
+
           </div>
         </aside>
 
@@ -549,12 +774,14 @@ const Editor: React.FC = () => {
             className="relative w-full max-w-4xl aspect-square md:aspect-[16/9] bg-white rounded-2xl shadow-2xl overflow-hidden border-4 border-white ring-1 ring-slate-900/5 group transition-transform duration-200"
             style={{ transform: `scale(${zoom / 100})` }}
           >
-            {/* Background Layers - Fixed Logic */}
-            {customBgColor ? (
-               // Solid Color Layer
+            {/* Background Layers */}
+            {bgImage ? (
+               <div className="absolute inset-0 z-0">
+                 <img src={bgImage} className="w-full h-full object-cover" alt="AI Background" />
+               </div>
+            ) : customBgColor ? (
                <div className="absolute inset-0 z-0" style={{ backgroundColor: customBgColor }}></div>
             ) : (
-               // Checkerboard Layer
                <div className="absolute inset-0 z-0 bg-checkerboard bg-checkerboard-pattern"></div>
             )}
 
@@ -573,13 +800,14 @@ const Editor: React.FC = () => {
             )}
 
             {/* Loading State */}
-            {(isLoading || isUpscaling) && (
+            {(isLoading || isUpscaling || isGeneratingBg) && (
               <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm">
                 <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
                 <p className="text-slate-800 font-bold text-lg animate-pulse">
-                  {isUpscaling ? 'HD Keyfiyyətə yüksəldilir...' : 'Süni intellekt emal edir...'}
+                  {isUpscaling ? 'HD Keyfiyyətə yüksəldilir...' : isGeneratingBg ? 'AI fon yaradılır...' : 'Süni intellekt emal edir...'}
                 </p>
                 {isUpscaling && <p className="text-slate-500 text-xs mt-2">React Canvas gücü istifadə olunur</p>}
+                {isGeneratingBg && <p className="text-slate-500 text-xs mt-2">DALL·E 3 AI modeli istifadə olunur</p>}
               </div>
             )}
 
@@ -606,7 +834,7 @@ const Editor: React.FC = () => {
                       className="w-full h-full object-contain relative z-10" 
                       alt="Result" 
                       style={{ 
-                        filter: `drop-shadow(${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColor}) ${featherRadius > 0 ? `blur(${featherRadius * 0.1}px)` : ''}`,
+                        filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) drop-shadow(${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColor}) ${featherRadius > 0 ? `blur(${featherRadius * 0.1}px)` : ''}`,
                       }}
                      />
                   </div>

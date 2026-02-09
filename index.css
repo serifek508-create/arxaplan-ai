@@ -356,3 +356,42 @@ input[type=range]::-webkit-slider-runnable-track {
   transform: translateY(-4px);
   box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.1);
 }
+
+/* ================================================
+   Marquee Animation
+   ================================================ */
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-33.33%); }
+}
+
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* ================================================
+   Gradient Border Effect
+   ================================================ */
+
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 2px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, #13c8ec, #4c8d9a, #9333ea, #13c8ec);
+  background-size: 300% 300%;
+  animation: gradient-shift 4s ease infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}

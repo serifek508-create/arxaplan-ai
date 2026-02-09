@@ -13,6 +13,10 @@ import Editor from './components/Editor';
 import MobilePrototype from './components/MobilePrototype';
 import AuthModal from './components/AuthModal';
 import ToastContainer from './components/ToastContainer';
+import ToolsShowcase from './components/ToolsShowcase';
+import TrustedBy from './components/TrustedBy';
+import CTA from './components/CTA';
+import BatchProcessor from './components/BatchProcessor';
 
 const Layout: React.FC<{ children: React.ReactNode; onAuthOpen: () => void }> = ({ children, onAuthOpen }) => {
   return (
@@ -49,13 +53,17 @@ const App: React.FC = () => {
             <Route path="/" element={
               <Layout onAuthOpen={() => setAuthModalOpen(true)}>
                 <Hero />
+                <TrustedBy />
                 <HowItWorks />
+                <ToolsShowcase />
                 <StatsSection />
                 <Testimonials />
                 <Pricing />
+                <CTA />
               </Layout>
             } />
             <Route path="/editor" element={<Editor />} />
+            <Route path="/batch" element={<BatchProcessor />} />
             <Route path="/mobile" element={<MobilePrototype />} />
           </Routes>
           <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />

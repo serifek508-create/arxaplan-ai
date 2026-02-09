@@ -45,9 +45,10 @@ const Navbar: React.FC<NavbarProps> = ({ onAuthOpen }) => {
             {/* Navigation Links - Desktop */}
             <nav className="hidden md:flex items-center gap-8">
               <button onClick={() => scrollToSection('how-it-works')} className="text-[#0d191b]/80 hover:text-primary text-sm font-semibold transition-colors cursor-pointer">Necə işləyir?</button>
+              <button onClick={() => scrollToSection('tools')} className="text-[#0d191b]/80 hover:text-primary text-sm font-semibold transition-colors cursor-pointer">Alətlər</button>
               <button onClick={() => scrollToSection('pricing')} className="text-[#0d191b]/80 hover:text-primary text-sm font-semibold transition-colors cursor-pointer">Qiymətlər</button>
               <button onClick={() => scrollToSection('testimonials')} className="text-[#0d191b]/80 hover:text-primary text-sm font-semibold transition-colors cursor-pointer">Rəylər</button>
-              <Link to="/mobile" className="text-[#0d191b]/80 hover:text-primary text-sm font-semibold transition-colors">Mobil App</Link>
+              <Link to="/batch" className="text-[#0d191b]/80 hover:text-primary text-sm font-semibold transition-colors">Toplu Emal</Link>
             </nav>
 
             {/* Auth/Action Buttons */}
@@ -111,9 +112,10 @@ const Navbar: React.FC<NavbarProps> = ({ onAuthOpen }) => {
           <div className="absolute top-20 left-4 right-4 bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 animate-fade-in-down z-50">
             <nav className="flex flex-col gap-1">
               <button onClick={() => scrollToSection('how-it-works')} className="w-full text-left px-4 py-3 rounded-xl text-[#0d191b] hover:bg-primary/5 hover:text-primary text-sm font-semibold transition-colors">Necə işləyir?</button>
+              <button onClick={() => scrollToSection('tools')} className="w-full text-left px-4 py-3 rounded-xl text-[#0d191b] hover:bg-primary/5 hover:text-primary text-sm font-semibold transition-colors">Alətlər</button>
               <button onClick={() => scrollToSection('pricing')} className="w-full text-left px-4 py-3 rounded-xl text-[#0d191b] hover:bg-primary/5 hover:text-primary text-sm font-semibold transition-colors">Qiymətlər</button>
               <button onClick={() => scrollToSection('testimonials')} className="w-full text-left px-4 py-3 rounded-xl text-[#0d191b] hover:bg-primary/5 hover:text-primary text-sm font-semibold transition-colors">Rəylər</button>
-              <Link to="/mobile" onClick={() => setMobileMenuOpen(false)} className="px-4 py-3 rounded-xl text-[#0d191b] hover:bg-primary/5 hover:text-primary text-sm font-semibold transition-colors">Mobil App</Link>
+              <Link to="/batch" onClick={() => setMobileMenuOpen(false)} className="px-4 py-3 rounded-xl text-[#0d191b] hover:bg-primary/5 hover:text-primary text-sm font-semibold transition-colors">Toplu Emal</Link>
               
               {!user && (
                 <button 
