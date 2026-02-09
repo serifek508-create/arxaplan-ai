@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { UploadCloud, PlayCircle, Star, Sparkles, Wand2, Zap, Monitor } from 'lucide-react';
+import { UploadCloud, PlayCircle, Star, Sparkles, Wand2, Zap, Monitor, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ImageSlider from './ImageSlider';
 
@@ -28,6 +28,11 @@ const Hero: React.FC = () => {
     if (file) {
       navigate('/editor', { state: { file } });
     }
+  };
+
+  const scrollToHowItWorks = () => {
+    const el = document.getElementById('how-it-works');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const MODEL_ORIGINAL = "https://lh3.googleusercontent.com/aida-public/AB6AXuAU_TfdzohpwVs5g-9dt60RWgxbDw44tEDOjBJjKiEdU0uzuHt8nA40ndKXr-3JZVH2t15hmAG2WBXbCsjClJSJyhz4xPTxu0w_nhcrEaGbMuFMMMIPCc9payJDSXk9zJQh1rcJY1W9nNxLxfxnmm2rmyd-tcSR4f4DIUPR1sN-cn1-8Ru2UBcg4yCqOfyZz5taOltQ7DC-yuGiu95v_ygXH75IPTmMCtI2QZHKxhsPjjf8XFcryn301WUOHEzKYD_5uCRX_GfEUUY9";
@@ -70,12 +75,15 @@ const Hero: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start pt-4">
               <button 
                 onClick={handleUploadClick}
-                className="h-14 min-w-[180px] px-8 rounded-xl bg-primary hover:bg-primary-dark text-white text-base font-bold shadow-glow hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
+                className="h-14 min-w-[180px] px-8 rounded-xl bg-primary hover:bg-primary-dark text-white text-base font-bold shadow-glow hover:shadow-glow-lg transition-all duration-300 flex items-center justify-center gap-2 btn-ripple hover:scale-[1.02] active:scale-[0.98]"
               >
                 <UploadCloud className="w-6 h-6" />
                 Şəkil yüklə
               </button>
-              <button className="h-14 min-w-[160px] px-8 rounded-xl bg-white hover:bg-gray-50 text-[#0d191b] text-base font-bold shadow-sm border border-gray-200 transition-all duration-300 flex items-center justify-center gap-2">
+              <button 
+                onClick={scrollToHowItWorks}
+                className="h-14 min-w-[160px] px-8 rounded-xl bg-white hover:bg-gray-50 text-[#0d191b] text-base font-bold shadow-sm border border-gray-200 transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] hover:border-primary/30"
+              >
                 <PlayCircle className="w-6 h-6" />
                 Necə işləyir?
               </button>
@@ -145,17 +153,18 @@ const Hero: React.FC = () => {
             </div>
             
             {/* Floating Badge */}
-            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 glass-panel py-2 px-4 rounded-lg shadow-lg flex items-center gap-3 z-30 animate-bounce" style={{animationDuration: '3s'}}>
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 glass-panel-enhanced py-2.5 px-5 rounded-xl shadow-xl flex items-center gap-3 z-30 animate-float-slow">
+              <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-sm font-bold text-[#0d191b]">1M+ Şəkil emal edilib</span>
+              <Sparkles className="w-4 h-4 text-primary" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Features Grid */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="grid md:grid-cols-3 gap-6">
+      <div id="features" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6">
           <FeatureItem 
             icon={<Wand2 className="w-6 h-6 text-blue-500" />} 
             color="bg-blue-50"
@@ -174,6 +183,12 @@ const Hero: React.FC = () => {
             title="Saniyələr içində"
             desc="Vaxtınıza qənaət edin. Mürəkkəb proqramlara ehtiyac olmadan nəticə əldə edin."
           />
+          <FeatureItem 
+            icon={<Shield className="w-6 h-6 text-orange-500" />} 
+            color="bg-orange-50"
+            title="Təhlükəsiz"
+            desc="Şəkilləriniz serverlərimizdə saxlanılmır. Məxfiliiyiniz bizim üçün önəmlidir."
+          />
         </div>
       </div>
     </div>
@@ -181,8 +196,8 @@ const Hero: React.FC = () => {
 };
 
 const FeatureItem: React.FC<{icon: React.ReactNode, color: string, title: string, desc: string}> = ({ icon, color, title, desc }) => (
-  <div className="bg-white/60 p-6 rounded-xl border border-white/60 shadow-sm flex flex-col gap-3 hover:shadow-md transition-shadow">
-    <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center mb-1`}>
+  <div className="bg-white/60 p-6 rounded-xl border border-white/60 shadow-sm flex flex-col gap-3 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-default">
+    <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center mb-1 group-hover:scale-110 transition-transform duration-300`}>
       {icon}
     </div>
     <h3 className="text-lg font-bold text-[#0d191b]">{title}</h3>

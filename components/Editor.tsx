@@ -1,21 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Wand2, Image as ImageIcon, RotateCcw, RotateCw, Share2, 
   Download, Eraser, Palette, Component, ChevronLeft, Minus, Plus, Maximize,
-  SplitSquareHorizontal, Grid, User, Loader2, Upload, UploadCloud, Sparkles, CheckCircle2
+  SplitSquareHorizontal, Grid, User, Loader2, Upload, UploadCloud, Sparkles, CheckCircle2, Copy, Check
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import ImageSlider from './ImageSlider';
+import { useToast } from '../lib/useToast';
 
 const Editor: React.FC = () => {
   const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { addToast } = useToast();
 
   const [activeTool, setActiveTool] = useState('feather');
   const [zoom, setZoom] = useState(100);
   const [featherRadius, setFeatherRadius] = useState(0);
   const [viewMode, setViewMode] = useState<'compare' | 'transparent' | 'white'>('transparent');
   const [customBgColor, setCustomBgColor] = useState<string>('');
+  
+  // Shadow settings
+  const [shadowOffsetX, setShadowOffsetX] = useState(0);
+  const [shadowOffsetY, setShadowOffsetY] = useState(8);
+  const [shadowBlur, setShadowBlur] = useState(16);
+  const [shadowColor, setShadowColor] = useState('rgba(0,0,0,0.3)');
 
   // Image Processing State
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -25,8 +33,40 @@ const Editor: React.FC = () => {
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [isHd, setIsHd] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const API_KEY = import.meta.env.VITE_REMOVEBG_API_KEY || ""; 
+  // Undo/Redo history
+  const [history, setHistory] = useState<Array<{ image: string; label: string }>>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  const API_KEY = import.meta.env.VITE_REMOVEBG_API_KEY || "";
+
+  const pushToHistory = useCallback((imageUrl: string, label: string) => {
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push({ image: imageUrl, label });
+      return newHistory;
+    });
+    setHistoryIndex(prev => prev + 1);
+  }, [historyIndex]);
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setProcessedImage(history[newIndex].image);
+      addToast(`Geri: ${history[newIndex].label}`, 'info');
+    }
+  }, [historyIndex, history, addToast]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setProcessedImage(history[newIndex].image);
+      addToast(`İrəli: ${history[newIndex].label}`, 'info');
+    }
+  }, [historyIndex, history, addToast]);
 
   useEffect(() => {
     if (location.state?.file) {
@@ -73,6 +113,7 @@ const Editor: React.FC = () => {
       const blob = await response.blob();
       const resultUrl = URL.createObjectURL(blob);
       setProcessedImage(resultUrl);
+      pushToHistory(resultUrl, 'Arxa plan silindi');
       setViewMode('compare'); 
     } catch (err: any) {
       console.error(err);
@@ -156,9 +197,11 @@ const Editor: React.FC = () => {
           if (blob) {
             const hdUrl = URL.createObjectURL(blob);
             setProcessedImage(hdUrl);
+            pushToHistory(hdUrl, 'HD keyfiyyətə yüksəldildi');
             setIsHd(true);
-            setViewMode('transparent'); // Show the result immediately
-            setCustomBgColor(''); // Reset BG to show transparency
+            setViewMode('transparent');
+            setCustomBgColor('');
+            addToast('HD keyfiyyətə yüksəldildi!', 'success');
           }
           setIsUpscaling(false);
         }, 'image/png');
@@ -178,6 +221,43 @@ const Editor: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    addToast('Şəkil uğurla yükləndi!', 'success');
+  };
+
+  const handleShare = async () => {
+    if (!processedImage) return;
+    
+    try {
+      // Try Web Share API first
+      if (navigator.share) {
+        const response = await fetch(processedImage);
+        const blob = await response.blob();
+        const file = new File([blob], `arxaplan_${fileName}`, { type: blob.type });
+        
+        await navigator.share({
+          title: 'ArxaPlan.ai - AI ilə emal edilmiş şəkil',
+          text: 'ArxaPlan.ai ilə arxa planı silinmiş şəkil',
+          files: [file],
+        });
+        addToast('Paylaşıldı!', 'success');
+      } else {
+        // Fallback: copy URL to clipboard
+        await navigator.clipboard.writeText(window.location.origin);
+        setCopied(true);
+        addToast('Link kopyalandı!', 'success');
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch (err) {
+      // If share fails, copy link
+      try {
+        await navigator.clipboard.writeText(window.location.origin);
+        setCopied(true);
+        addToast('Link kopyalandı!', 'info');
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        addToast('Paylaşma uğursuz oldu', 'error');
+      }
+    }
   };
 
   const handleNewUploadClick = () => {
@@ -264,11 +344,33 @@ const Editor: React.FC = () => {
               <Upload className="w-4 h-4" />
               Yeni
             </button>
+
+            {/* Share button */}
+            {processedImage && !isLoading && (
+              <button 
+                onClick={handleShare}
+                className="hidden sm:flex items-center justify-center gap-2 h-10 px-4 rounded-xl hover:bg-slate-100 text-slate-600 text-sm font-bold transition-all"
+              >
+                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Share2 className="w-4 h-4" />}
+                {copied ? 'Kopyalandı' : 'Paylaş'}
+              </button>
+            )}
+
             <div className="hidden sm:flex items-center bg-white/50 rounded-lg p-1 mr-2 border border-slate-200">
-              <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-600 transition-colors" title="Geri qaytar">
+              <button 
+                onClick={handleUndo}
+                disabled={historyIndex <= 0}
+                className={`p-1.5 rounded-md transition-colors ${historyIndex > 0 ? 'hover:bg-slate-100 text-slate-600 cursor-pointer' : 'text-slate-300 cursor-not-allowed'}`} 
+                title="Geri qaytar"
+              >
                 <RotateCcw className="w-5 h-5" />
               </button>
-              <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 cursor-not-allowed transition-colors" title="İrəli">
+              <button 
+                onClick={handleRedo}
+                disabled={historyIndex >= history.length - 1}
+                className={`p-1.5 rounded-md transition-colors ${historyIndex < history.length - 1 ? 'hover:bg-slate-100 text-slate-600 cursor-pointer' : 'text-slate-300 cursor-not-allowed'}`} 
+                title="İrəli"
+              >
                 <RotateCw className="w-5 h-5" />
               </button>
             </div>
@@ -351,6 +453,69 @@ const Editor: React.FC = () => {
               label="Kölgə" 
               onClick={() => setActiveTool('shadow')}
             />
+
+            {activeTool === 'shadow' && (
+              <div className="hidden lg:block mt-1 px-4 py-3 bg-white/50 rounded-lg border border-primary/10 animate-in fade-in slide-in-from-top-2">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-500 font-medium">X Ofset</span>
+                      <span className="text-xs text-primary font-bold">{shadowOffsetX}px</span>
+                    </div>
+                    <input 
+                      type="range" min="-20" max="20" step="1" value={shadowOffsetX}
+                      onChange={(e) => setShadowOffsetX(parseInt(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-500 font-medium">Y Ofset</span>
+                      <span className="text-xs text-primary font-bold">{shadowOffsetY}px</span>
+                    </div>
+                    <input 
+                      type="range" min="-20" max="20" step="1" value={shadowOffsetY}
+                      onChange={(e) => setShadowOffsetY(parseInt(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-500 font-medium">Bulanıqlıq</span>
+                      <span className="text-xs text-primary font-bold">{shadowBlur}px</span>
+                    </div>
+                    <input 
+                      type="range" min="0" max="50" step="1" value={shadowBlur}
+                      onChange={(e) => setShadowBlur(parseInt(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500 font-medium block mb-2">Kölgə rəngi</span>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)',
+                        'rgba(19,200,236,0.3)', 'rgba(147,51,234,0.3)', 'rgba(239,68,68,0.3)',
+                        'rgba(34,197,94,0.3)', 'rgba(59,130,246,0.3)',
+                      ].map((color, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setShadowColor(color)}
+                          className={`w-6 h-6 rounded-full border shadow-sm ${shadowColor === color ? 'ring-2 ring-primary ring-offset-1' : 'border-slate-200'}`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setShadowOffsetX(0); setShadowOffsetY(0); setShadowBlur(0); }}
+                    className="text-xs text-red-400 hover:text-red-600 font-medium mt-1 transition-colors"
+                  >
+                    Kölgəni sıfırla
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </aside>
 
@@ -441,7 +606,7 @@ const Editor: React.FC = () => {
                       className="w-full h-full object-contain relative z-10" 
                       alt="Result" 
                       style={{ 
-                        filter: `drop-shadow(0 0 ${featherRadius}px rgba(255,255,255,0.5))` 
+                        filter: `drop-shadow(${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px ${shadowColor}) ${featherRadius > 0 ? `blur(${featherRadius * 0.1}px)` : ''}`,
                       }}
                      />
                   </div>
