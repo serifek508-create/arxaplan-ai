@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase';
+import { incrementStat } from './database';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface UserProfile {
@@ -98,7 +99,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       // Update global stats
-      await supabase.rpc('increment_stat', { stat_name: 'total_users' }).catch(() => {});
+      try {
+        await incrementStat('total_users');
+      } catch {
+        // Stats increment is non-critical
+      }
     }
 
     return { error: null };
